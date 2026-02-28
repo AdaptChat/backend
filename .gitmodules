@@ -1,0 +1,12 @@
+[submodule "webserver"]
+	path = webserver
+	url = https://github.com/adaptchat/webserver
+[submodule "essence"]
+	path = essence
+	url = https://github.com/adaptchat/essence
+[submodule "harmony"]
+	path = harmony
+	url = https://github.com/adaptchat/harmony
+[submodule "convey"]
+	path = convey
+	url = https://github.com/adaptchat/convey
