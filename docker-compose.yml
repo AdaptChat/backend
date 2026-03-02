@@ -1,0 +1,144 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adapt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: adapt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adapt -d adapt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./essence/migrations:/migrations
+    command: >
+      -path=/migrations
+      -database=postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt?sslmode=disable
+      up
+    restart: on-failure
+
+  webserver:
+    build:
+      context: .
+      target: webserver
+      args:
+        WEBSERVER_DATABASE_URL: "postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt"
+        WEBSERVER_REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
+        WEBSERVER_CDN_URL: "${CDN_URL}"
+        WEBSERVER_CDN_AUTH: "${CDN_AUTHORIZATION}"
+        SECRET_KEY_PATH: "${SECRET_KEY_PATH:-webserver/secret.key}"
+    restart: unless-stopped
+    ports:
+      - "${WEBSERVER_PORT:-8077}:8077"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Adapt}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_DOMAIN_BLOCKLIST: ${EMAIL_DOMAIN_BLOCKLIST:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      GOOGLE_FCM_PROJECT_ID: ${GOOGLE_FCM_PROJECT_ID:-adapt-chat}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-credentials.json
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH:-/dev/null}:/run/secrets/gcp-credentials.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  harmony:
+    build:
+      context: .
+      target: harmony
+    restart: unless-stopped
+    ports:
+      - "${HARMONY_PORT:-8076}:8076"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      DB_URL: "postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  convey:
+    build:
+      context: .
+      target: convey
+    restart: unless-stopped
+    ports:
+      - "${CONVEY_PORT:-8078}:8078"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+      AUTH: ${CONVEY_AUTH}
+      MAX_SIZE: ${CONVEY_MAX_SIZE:-10485760}
+      USE_ZSTD_AT: ${CONVEY_USE_ZSTD_AT:-20}
+      FILE_STORAGE_PATH: /app/files
+      ASSETS_PATH: /app/assets
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+    volumes:
+      - convey_files:/app/files
+      - ./convey/assets:/app/assets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  convey_files:

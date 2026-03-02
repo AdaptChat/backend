@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+    "essence",
+    "webserver",
+    "harmony",
+    "convey",
+]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
