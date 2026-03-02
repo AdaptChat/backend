@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: adapt
+      POSTGRES_USER: ${POSTGRES_USER:-adapt}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: adapt
+      POSTGRES_DB: ${POSTGRES_DB:-adapt}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U adapt -d adapt"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-adapt} -d ${POSTGRES_DB:-adapt}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -17,11 +17,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -49,7 +49,7 @@ services:
       - ./essence/migrations:/migrations
     command: >
       -path=/migrations
-      -database=postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt?sslmode=disable
+      -database=postgres://${POSTGRES_USER:-adapt}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-adapt}?sslmode=disable
       up
     restart: on-failure
 
@@ -58,8 +58,8 @@ services:
       context: .
       target: webserver
       args:
-        WEBSERVER_DATABASE_URL: "postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt"
-        WEBSERVER_REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
+        WEBSERVER_DATABASE_URL: "postgres://${POSTGRES_USER:-adapt}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-adapt}"
+        WEBSERVER_REDIS_URL: "redis://:${REDIS_PASSWORD:-redis}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}"
         WEBSERVER_CDN_URL: "${CDN_URL}"
         WEBSERVER_CDN_AUTH: "${CDN_AUTHORIZATION}"
         SECRET_KEY_PATH: "${SECRET_KEY_PATH:-webserver/secret.key}"
@@ -99,8 +99,8 @@ services:
       - "${HARMONY_PORT:-8076}:8076"
     environment:
       RUST_LOG: ${RUST_LOG:-info}
-      DB_URL: "postgres://adapt:${POSTGRES_PASSWORD}@postgres:5432/adapt"
-      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
+      DB_URL: "postgres://${POSTGRES_USER:-adapt}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-adapt}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-redis}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}"
     depends_on:
       postgres:
         condition: service_healthy

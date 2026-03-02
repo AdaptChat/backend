@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.85-bookworm AS builder
+FROM rustlang/rust:nightly-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 
 COPY Cargo.toml Cargo.toml
+COPY rust-toolchain.toml rust-toolchain.toml
 COPY essence/ essence/
 COPY webserver/ webserver/
 COPY harmony/ harmony/
@@ -31,6 +32,7 @@ RUN DATABASE_URL="${WEBSERVER_DATABASE_URL}" \
     CDN_URL="${WEBSERVER_CDN_URL}" \
     CDN_AUTHORIZATION="${WEBSERVER_CDN_AUTH}" \
     SECRET_KEY_PATH="/build/${SECRET_KEY_PATH}" \
+    SQLX_OFFLINE=true \
     cargo build --workspace --all-features --release
 
 FROM debian:bookworm-slim AS webserver
