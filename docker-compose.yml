@@ -68,6 +68,7 @@ services:
       - "${WEBSERVER_PORT:-8077}:8077"
     environment:
       RUST_LOG: ${RUST_LOG:-info}
+      AMQP_URL: "amqp://guest:guest@rabbitmq:5672"
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
@@ -101,6 +102,7 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       DB_URL: "postgres://${POSTGRES_USER:-adapt}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-adapt}"
       REDIS_URL: "redis://:${REDIS_PASSWORD:-redis}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}"
+      AMQP_URL: "amqp://guest:guest@rabbitmq:5672"
     depends_on:
       postgres:
         condition: service_healthy
